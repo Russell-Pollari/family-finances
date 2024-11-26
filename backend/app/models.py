@@ -28,7 +28,15 @@ class Transaction(Base):
     account_id: Mapped[int] = Column(Integer, ForeignKey("accounts.id"))
     date: Mapped[datetime] = Column(DateTime, default=datetime.utcnow)
     description: Mapped[str] = Column(String)
-    amount: Mapped[float] = Column(Float)
+    credit: Mapped[float | None] = Column(Float, nullable=True)
+    debit: Mapped[float | None] = Column(Float, nullable=True)
     category: Mapped[str | None] = Column(String, nullable=True)
 
     account: Mapped[Account] = relationship("Account", back_populates="transactions")
+
+    @property
+    def amount(self) -> float:
+        """Calculate the net amount (credit - debit)"""
+        credit = self.credit or 0.0
+        debit = self.debit or 0.0
+        return credit - debit

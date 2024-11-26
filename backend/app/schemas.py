@@ -1,4 +1,4 @@
-from pydantic import BaseModel
+from pydantic import BaseModel, root_validator
 from datetime import datetime
 from typing import List, Optional
 
@@ -6,8 +6,16 @@ from typing import List, Optional
 class TransactionBase(BaseModel):
     date: datetime
     description: str
-    amount: float
+    credit: Optional[float] = None
+    debit: Optional[float] = None
     category: Optional[str] = None
+
+    @property
+    def amount(self) -> float:
+        """Calculate the net amount (credit - debit)"""
+        credit = self.credit or 0.0
+        debit = self.debit or 0.0
+        return credit - debit
 
 
 class TransactionCreate(TransactionBase):
@@ -32,11 +40,12 @@ class AccountCreate(AccountBase):
 
 class Account(AccountBase):
     id: int
-    balance: float
+    balance: Optional[float] = None
     transactions: List[Transaction] = []
 
     class Config:
         orm_mode = True
+        arbitrary_types_allowed = True
 
 
 class UploadTransactionsResponse(BaseModel):

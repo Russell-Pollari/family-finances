@@ -1,9 +1,8 @@
 import os
-from fastapi import FastAPI, File, UploadFile, Depends, HTTPException
+from fastapi import FastAPI, UploadFile, Depends, HTTPException
 from sqlalchemy.orm import Session
 from fastapi.middleware.cors import CORSMiddleware
-from pprint import pprint
-from typing import List, Sequence
+from typing import List, Dict, Union, Sequence
 
 from app import models, schemas
 from app.database import engine, get_db
@@ -30,7 +29,7 @@ def create_account(
     account: schemas.AccountCreate, db: Session = Depends(get_db)
 ) -> models.Account:
     """Create a new account"""
-    db_account = models.Account(name=account.name)
+    db_account = models.Account(name=account.name, balance=0)
     db.add(db_account)
     db.commit()
     db.refresh(db_account)
@@ -38,25 +37,20 @@ def create_account(
 
 
 @app.get("/accounts/", response_model=List[schemas.Account])
-def read_accounts(
-    skip: int = 0, limit: int = 100, db: Session = Depends(get_db)
-) -> Sequence[models.Account]:
+def read_accounts(skip: int = 0, limit: int = 100, db: Session = Depends(get_db)):
     """Retrieve all accounts"""
     accounts = db.query(models.Account).offset(skip).limit(limit).all()
     return accounts
 
 
-@app.post("/upload-transactions/{account_id}")
+@app.post("/upload-transactions/{account_id}", response_model=schemas.Account)
 async def upload_transactions(
-    file: UploadFile = File(...),
-    account_id: int | None = None,
+    file: UploadFile,
+    account_id: int,
     db: Session = Depends(get_db),
 ):
     """Upload and parse CSV transactions for an account"""
     # Ensure account exists
-    if account_id is None:
-        raise HTTPException(status_code=400, detail="Account ID is required")
-
     account = db.query(models.Account).filter(models.Account.id == account_id).first()
     if not account:
         raise HTTPException(status_code=404, detail="Account not found")
@@ -67,7 +61,7 @@ async def upload_transactions(
         buffer.write(await file.read())
 
     try:
-        # Parse CSV using the new parser
+        # Parse CSV
         parser = CSVParser(temp_path)
         parsed_transactions = parser.parse_transactions()
 
@@ -77,28 +71,36 @@ async def upload_transactions(
             )
 
         # Create transactions
-        pprint(parsed_transactions)
         transactions = []
+        total_amount = 0.0
         for t_data in parsed_transactions:
+            credit = t_data.get("credit")
+            debit = t_data.get("debit")
+            amount = (credit or 0.0) - (debit or 0.0)
+            print(credit)
+            print(debit)
+            print(amount)
             transaction = models.Transaction(
                 account_id=account_id,
                 date=t_data["date"],
                 description=t_data["description"],
-                amount=t_data["amount"],
+                credit=credit,
+                debit=debit,
                 category=t_data.get("category"),
             )
+            total_amount += amount
             db.add(transaction)
             transactions.append(transaction)
 
-        # Update account balance if account exists
-        if account_id and account is not None:
-            total_amount = sum(float(t.amount) for t in transactions)
-            account.balance += total_amount
-
+        # Update account balance
+        if account.balance is None:
+            account.balance = 0
+        account.balance += total_amount
+        print(total_amount)
+        print(account.balance)
         # Commit transactions
         db.commit()
-        for transaction in transactions:
-            db.refresh(transaction)
+        db.refresh(account)
 
     except Exception as e:
         raise HTTPException(status_code=400, detail=str(e))
@@ -106,23 +108,18 @@ async def upload_transactions(
         # Remove temporary file
         os.remove(temp_path)
 
-    # txns = [schemas.Transaction.from_orm(t) for t in transactions]
-    # response = schemas.UploadTransactionsResponse(
-    #     message=f"Successfully uploaded {len(transactions)} transactions",
-    #     transactions=txns,
-    # )
-    # pprint(response)
-
-    return "ok"
+    return account
 
 
-@app.get("/accounts/{account_id}/transactions/")
+@app.get(
+    "/accounts/{account_id}/transactions/", response_model=List[schemas.Transaction]
+)
 def read_account_transactions(
     account_id: int,
     skip: int = 0,
     limit: int = 100,
     db: Session = Depends(get_db),
-) -> Sequence[schemas.Transaction]:
+) -> Sequence[models.Transaction]:
     """Retrieve transactions for a specific account"""
     transactions = (
         db.query(models.Transaction)
@@ -131,6 +128,4 @@ def read_account_transactions(
         .limit(limit)
         .all()
     )
-
-    txns = [schemas.Transaction.from_orm(t) for t in list(transactions)]
-    return txns
+    return transactions
