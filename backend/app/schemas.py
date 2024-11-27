@@ -1,4 +1,4 @@
-from pydantic import BaseModel, root_validator
+from pydantic import BaseModel
 from datetime import datetime
 from typing import List, Optional
 
@@ -8,7 +8,7 @@ class TransactionBase(BaseModel):
     description: str
     credit: Optional[float] = None
     debit: Optional[float] = None
-    category: Optional[str] = None
+    category: Optional[str] = "Other"
 
     @property
     def amount(self) -> float:
@@ -23,7 +23,7 @@ class TransactionCreate(TransactionBase):
 
 
 class Transaction(TransactionBase):
-    id: int
+    id: Optional[int] = None
     account_id: int
 
     class Config:
@@ -54,3 +54,7 @@ class UploadTransactionsResponse(BaseModel):
 
     class Config:
         orm_mode = True
+
+
+class TransactionImportRequest(BaseModel):
+    transactions: List[TransactionCreate]
