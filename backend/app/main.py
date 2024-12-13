@@ -227,7 +227,7 @@ async def preview_transactions(
         os.remove(temp_path)
 
 
-@app.post("/import-transactions/{account_id}", response_model=schemas.Account)
+@app.post("/import-transactions/{account_id}", response_model=schemas.ImportResponse)
 async def import_transactions(
     account_id: int,
     import_data: schemas.TransactionImportRequest,
@@ -242,10 +242,26 @@ async def import_transactions(
     try:
         # Create transactions
         total_amount = 0.0
+        imported_count = 0
+        duplicate_count = 0
+        
         for t_data in import_data.transactions:
             credit = clean_float(t_data.credit)
             debit = clean_float(t_data.debit)
             amount = (credit or 0.0) - (debit or 0.0)
+
+            # Check for duplicate transactions
+            existing_transaction = db.query(models.Transaction).filter(
+                models.Transaction.account_id == account_id,
+                models.Transaction.date == t_data.date,
+                models.Transaction.description == t_data.description,
+                models.Transaction.credit == credit,
+                models.Transaction.debit == debit
+            ).first()
+
+            if existing_transaction:
+                duplicate_count += 1
+                continue
 
             transaction = models.Transaction(
                 account_id=account_id,
@@ -255,19 +271,19 @@ async def import_transactions(
                 debit=debit,
                 category=t_data.category,
             )
-            total_amount += amount
             db.add(transaction)
+            total_amount += amount
+            imported_count += 1
 
         # Update account balance
-        if account.balance is None:
-            account.balance = 0
         account.balance += total_amount
-
-        # Commit transactions
         db.commit()
-        db.refresh(account)
 
-        return account
+        return {
+            "account": account,
+            "imported_count": imported_count,
+            "duplicate_count": duplicate_count
+        }
 
     except Exception as e:
         db.rollback()

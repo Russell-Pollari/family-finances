@@ -102,28 +102,30 @@ function App() {
         `${API_BASE_URL}/import-transactions/${selectedAccount.id}`,
         { transactions: formattedTransactions }
       );
+
+      // Update the account in the accounts list
+      setAccounts(accounts.map(acc => 
+        acc.id === response.data.account.id ? response.data.account : acc
+      ));
       
-      // Update the account in the accounts list with the new balance
-      const updatedAccounts = accounts.map(account => 
-        account.id === response.data.id ? response.data : account
-      );
-      setAccounts(updatedAccounts);
+      // Set the selected account to the updated account
+      setSelectedAccount(response.data.account);
       
-      // Update selected account if it's the one that was modified
-      if (selectedAccount.id === response.data.id) {
-        setSelectedAccount(response.data);
-      }
+      // Show import results
+      alert(`Import complete!\nImported: ${response.data.imported_count} transactions\nSkipped ${response.data.duplicate_count} duplicate transactions`);
+      
+      // Reset state
+      setIsPreviewMode(false);
+      setPreviewTransactions([]);
       
       // Refresh transactions
       const transactionsResponse = await axios.get(
         `${API_BASE_URL}/accounts/${selectedAccount.id}/transactions/`
       );
       setTransactions(transactionsResponse.data);
-      
-      // Exit preview mode
-      setIsPreviewMode(false);
     } catch (error) {
       console.error('Error importing transactions:', error);
+      alert('Error importing transactions');
     }
   };
 

@@ -58,3 +58,9 @@ class UploadTransactionsResponse(BaseModel):
 
 class TransactionImportRequest(BaseModel):
     transactions: List[TransactionCreate]
+
+
+class ImportResponse(BaseModel):
+    account: Account
+    imported_count: int
+    duplicate_count: int
