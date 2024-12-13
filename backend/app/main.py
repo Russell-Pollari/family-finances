@@ -133,7 +133,7 @@ def clean_float(value) -> Optional[float]:
     try:
         # Convert to float and check if it's a valid JSON number
         cleaned = float(value)
-        if not (float('-inf') < cleaned < float('inf')):
+        if not (float("-inf") < cleaned < float("inf")):
             return None
         return cleaned
     except (ValueError, TypeError):
@@ -175,7 +175,7 @@ async def preview_transactions(
             # Clean numeric values
             credit = clean_float(t_data.get("credit"))
             debit = clean_float(t_data.get("debit"))
-            
+
             # Skip transactions with invalid amounts
             if credit is None and debit is None:
                 continue
@@ -196,7 +196,8 @@ async def preview_transactions(
 
         if not preview_transactions:
             raise HTTPException(
-                status_code=400, detail="No valid transactions found after cleaning data"
+                status_code=400,
+                detail="No valid transactions found after cleaning data",
             )
 
         return preview_transactions
