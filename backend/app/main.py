@@ -126,6 +126,24 @@ def read_account_transactions(
     return transactions
 
 
+@app.delete("/accounts/{account_id}")
+def delete_account(account_id: int, db: Session = Depends(get_db)):
+    """Delete an account and all its transactions"""
+    # Get the account
+    account = db.query(models.Account).filter(models.Account.id == account_id).first()
+    if not account:
+        raise HTTPException(status_code=404, detail="Account not found")
+    
+    # Delete all transactions associated with the account
+    db.query(models.Transaction).filter(models.Transaction.account_id == account_id).delete()
+    
+    # Delete the account
+    db.delete(account)
+    db.commit()
+    
+    return {"message": "Account and all associated transactions deleted successfully"}
+
+
 def clean_float(value) -> Optional[float]:
     """Clean and validate float values"""
     if value is None:

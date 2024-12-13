@@ -139,6 +139,22 @@ function App() {
     }
   };
 
+  const handleDeleteAccount = async (accountId) => {
+    if (window.confirm('Are you sure you want to delete this account? This will also delete all associated transactions.')) {
+      try {
+        await axios.delete(`${API_BASE_URL}/accounts/${accountId}`);
+        setAccounts(accounts.filter(account => account.id !== accountId));
+        if (selectedAccount && selectedAccount.id === accountId) {
+          setSelectedAccount(null);
+          setTransactions([]);
+          setCategoryBreakdown(null);
+        }
+      } catch (error) {
+        console.error('Error deleting account:', error);
+      }
+    }
+  };
+
   const fetchCategoryBreakdown = async () => {
     if (!selectedAccount) return;
     try {
@@ -172,15 +188,24 @@ function App() {
           </button>
         </div>
         <div className="account-list">
+          <h2>Accounts</h2>
           {accounts.map(account => (
-            <div 
-              key={account.id} 
-              className={`account-item ${selectedAccount?.id === account.id ? 'selected' : ''}`}
-              onClick={() => setSelectedAccount(account)}
-            >
-              {account.name}
+            <div key={account.id} className="account-item">
+              <button
+                onClick={() => setSelectedAccount(account)}
+                className={selectedAccount?.id === account.id ? 'selected' : ''}
+              >
+                {account.name} - ${account.balance?.toFixed(2)}
+              </button>
+              <button 
+                onClick={() => handleDeleteAccount(account.id)}
+                className="delete-button"
+              >
+                Delete
+              </button>
             </div>
           ))}
+          <button onClick={() => setIsModalOpen(true)}>Create New Account</button>
         </div>
       </div>
 
